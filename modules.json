@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "aws",
+      "name": "AWS CloudTrail Integration",
+      "description": "SQS queue, IAM role, EventBridge rules, and KMS encryption for CloudTrail event ingestion.",
+      "tool": "terraform",
+      "path": "aws",
+      "minTerraformVersion": "1.5",
+      "providers": ["aws"]
+    }
+  ]
+}
