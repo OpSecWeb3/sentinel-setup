@@ -16,13 +16,13 @@ locals {
   tags = merge(
     {
       "ManagedBy"   = "terraform"
-      "Application" = "sentinel"
+      "Application" = "ca_sentinel"
       "Component"   = "aws-integration"
     },
     var.tags,
   )
 
-  kms_key_arn = var.create_kms_key ? aws_kms_key.sentinel[0].arn : var.kms_key_arn
+  kms_key_arn = var.create_kms_key ? aws_kms_key.ca_sentinel[0].arn : var.kms_key_arn
   use_kms     = local.kms_key_arn != null
 }
 
@@ -33,7 +33,7 @@ data "aws_region" "current" {}
 # KMS — encryption at rest for SQS
 # --------------------------------------------------------------------------
 
-resource "aws_kms_key" "sentinel" {
+resource "aws_kms_key" "ca_sentinel" {
   count = var.create_kms_key ? 1 : 0
 
   description             = "Encrypts Sentinel SQS queue messages"
@@ -72,7 +72,7 @@ resource "aws_kms_key" "sentinel" {
       {
         Sid       = "AllowSentinelDecrypt"
         Effect    = "Allow"
-        Principal = { AWS = aws_iam_role.sentinel.arn }
+        Principal = { AWS = aws_iam_role.ca_sentinel.arn }
         Action    = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource  = "*"
       },
@@ -80,18 +80,18 @@ resource "aws_kms_key" "sentinel" {
   })
 }
 
-resource "aws_kms_alias" "sentinel" {
+resource "aws_kms_alias" "ca_sentinel" {
   count = var.create_kms_key ? 1 : 0
 
   name          = "alias/${var.name_prefix}-sqs"
-  target_key_id = aws_kms_key.sentinel[0].key_id
+  target_key_id = aws_kms_key.ca_sentinel[0].key_id
 }
 
 # --------------------------------------------------------------------------
 # SQS — the queue Sentinel polls
 # --------------------------------------------------------------------------
 
-resource "aws_sqs_queue" "sentinel_dlq" {
+resource "aws_sqs_queue" "ca_sentinel_dlq" {
   name                      = "${var.name_prefix}-events-dlq"
   message_retention_seconds = 1209600 # 14 days — max retention for forensic review
   tags                      = local.tags
@@ -99,7 +99,7 @@ resource "aws_sqs_queue" "sentinel_dlq" {
   sqs_managed_sse_enabled = local.use_kms ? null : true
 }
 
-resource "aws_sqs_queue" "sentinel" {
+resource "aws_sqs_queue" "ca_sentinel" {
   name                       = "${var.name_prefix}-events"
   visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
   message_retention_seconds  = var.sqs_message_retention_seconds
@@ -112,14 +112,14 @@ resource "aws_sqs_queue" "sentinel" {
   sqs_managed_sse_enabled           = local.use_kms ? null : true
 
   redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.sentinel_dlq.arn
+    deadLetterTargetArn = aws_sqs_queue.ca_sentinel_dlq.arn
     maxReceiveCount     = 5
   })
 }
 
 # Allow EventBridge and optionally SNS to send messages to the queue.
-resource "aws_sqs_queue_policy" "sentinel" {
-  queue_url = aws_sqs_queue.sentinel.id
+resource "aws_sqs_queue_policy" "ca_sentinel" {
+  queue_url = aws_sqs_queue.ca_sentinel.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -131,7 +131,7 @@ resource "aws_sqs_queue_policy" "sentinel" {
           Effect    = "Allow"
           Principal = { Service = "events.amazonaws.com" }
           Action    = "sqs:SendMessage"
-          Resource  = aws_sqs_queue.sentinel.arn
+          Resource  = aws_sqs_queue.ca_sentinel.arn
           Condition = {
             ArnLike = {
               "aws:SourceArn" = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.name_prefix}-*"
@@ -147,7 +147,7 @@ resource "aws_sqs_queue_policy" "sentinel" {
           Effect    = "Allow"
           Principal = { Service = "sns.amazonaws.com" }
           Action    = "sqs:SendMessage"
-          Resource  = aws_sqs_queue.sentinel.arn
+          Resource  = aws_sqs_queue.ca_sentinel.arn
           Condition = {
             ArnEquals = {
               "aws:SourceArn" = var.cloudtrail_sns_topic_arn
@@ -165,7 +165,7 @@ resource "aws_sns_topic_subscription" "cloudtrail_to_sqs" {
 
   topic_arn            = var.cloudtrail_sns_topic_arn
   protocol             = "sqs"
-  endpoint             = aws_sqs_queue.sentinel.arn
+  endpoint             = aws_sqs_queue.ca_sentinel.arn
   raw_message_delivery = true
 }
 
@@ -190,8 +190,8 @@ resource "aws_cloudwatch_event_target" "cloudtrail_to_sqs" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
   rule      = aws_cloudwatch_event_rule.cloudtrail[0].name
-  target_id = "sentinel-sqs"
-  arn       = aws_sqs_queue.sentinel.arn
+  target_id = "ca_sentinel-sqs"
+  arn       = aws_sqs_queue.ca_sentinel.arn
 }
 
 # EC2 Spot Instance interruption warnings
@@ -212,15 +212,15 @@ resource "aws_cloudwatch_event_target" "spot_to_sqs" {
   count = var.enable_spot_interruption_rule ? 1 : 0
 
   rule      = aws_cloudwatch_event_rule.spot_interruption[0].name
-  target_id = "sentinel-sqs"
-  arn       = aws_sqs_queue.sentinel.arn
+  target_id = "ca_sentinel-sqs"
+  arn       = aws_sqs_queue.ca_sentinel.arn
 }
 
 # --------------------------------------------------------------------------
 # IAM — cross-account role for Sentinel
 # --------------------------------------------------------------------------
 
-resource "aws_iam_role" "sentinel" {
+resource "aws_iam_role" "ca_sentinel" {
   name = "${var.name_prefix}-integration-role"
   tags = local.tags
 
@@ -228,12 +228,12 @@ resource "aws_iam_role" "sentinel" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AllowSentinelAssume"
+        Sid       = "AllowCASentinelAssume"
         Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${var.sentinel_account_id}:role/${var.sentinel_role_name}" }
+        Principal = { AWS = "arn:aws:iam::${var.ca_sentinel_account_id}:role/${var.ca_sentinel_role_name}" }
         Action    = "sts:AssumeRole"
         Condition = {
-          # External ID prevents confused-deputy attacks
+          # External ID prevents confused-deputy attacks by ensuring only Sentinel can assume this role.
           StringEquals = { "sts:ExternalId" = var.external_id }
         }
       }
@@ -244,9 +244,9 @@ resource "aws_iam_role" "sentinel" {
   max_session_duration = 3600
 }
 
-resource "aws_iam_role_policy" "sentinel_sqs" {
+resource "aws_iam_role_policy" "ca_sentinel_sqs" {
   name = "${var.name_prefix}-sqs-read"
-  role = aws_iam_role.sentinel.id
+  role = aws_iam_role.ca_sentinel.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -261,18 +261,18 @@ resource "aws_iam_role_policy" "sentinel_sqs" {
           "sqs:GetQueueUrl",
         ]
         Resource = [
-          aws_sqs_queue.sentinel.arn,
+          aws_sqs_queue.ca_sentinel.arn,
         ]
       },
     ]
   })
 }
 
-resource "aws_iam_role_policy" "sentinel_kms" {
+resource "aws_iam_role_policy" "ca_sentinel_kms" {
   count = local.use_kms ? 1 : 0
 
   name = "${var.name_prefix}-kms-decrypt"
-  role = aws_iam_role.sentinel.id
+  role = aws_iam_role.ca_sentinel.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -292,10 +292,10 @@ resource "aws_iam_role_policy" "sentinel_kms" {
 # --------------------------------------------------------------------------
 
 resource "aws_sqs_queue_redrive_allow_policy" "dlq" {
-  queue_url = aws_sqs_queue.sentinel_dlq.id
+  queue_url = aws_sqs_queue.ca_sentinel_dlq.id
 
   redrive_allow_policy = jsonencode({
     redrivePermission = "byQueue"
-    sourceQueueArns   = [aws_sqs_queue.sentinel.arn]
+    sourceQueueArns   = [aws_sqs_queue.ca_sentinel.arn]
   })
 }

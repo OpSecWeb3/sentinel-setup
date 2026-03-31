@@ -6,12 +6,12 @@
 
 # Required: the AWS account ID where Sentinel is hosted.
 # Your Sentinel admin can provide this value.
-sentinel_account_id = "123456789012"
+ca_sentinel_account_id = "123456789012"
 
 # Required: name of the IAM role in the Sentinel account.
 # Default is "CASentinelServiceRole" — only change if your Sentinel deployment
 # uses a different role name.
-sentinel_role_name = "CASentinelServiceRole"
+ca_sentinel_role_name = "CASentinelServiceRole"
 
 # Required: external ID for cross-account trust.
 # Copy this value from Sentinel's integration setup screen (Step 1).
@@ -19,7 +19,7 @@ sentinel_role_name = "CASentinelServiceRole"
 external_id = "sentinel:YOUR_ORG_ID:COPY_FROM_SENTINEL_UI"
 
 # Optional: prefix for resource names (useful for multi-env accounts).
-# name_prefix = "sentinel-prod"
+# name_prefix = "ca_sentinel-prod"
 
 # Optional: custom tags merged with Sentinel defaults.
 # tags = {

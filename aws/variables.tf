@@ -2,17 +2,17 @@
 # Required
 # --------------------------------------------------------------------------
 
-variable "sentinel_account_id" {
+variable "ca_sentinel_account_id" {
   description = "The AWS account ID where Sentinel is hosted. Used in the IAM trust policy."
   type        = string
 
   validation {
-    condition     = can(regex("^\\d{12}$", var.sentinel_account_id))
-    error_message = "sentinel_account_id must be a 12-digit AWS account ID."
+    condition     = can(regex("^\\d{12}$", var.ca_sentinel_account_id))
+    error_message = "ca_sentinel_account_id must be a 12-digit AWS account ID."
   }
 }
 
-variable "sentinel_role_name" {
+variable "ca_sentinel_role_name" {
   description = "Name of the IAM role in the Sentinel account that will assume into this account. Defaults to 'CASentinelServiceRole'."
   type        = string
   default     = "CASentinelServiceRole"
@@ -25,7 +25,7 @@ variable "sentinel_role_name" {
 variable "name_prefix" {
   description = "Prefix for all resource names (e.g. 'prod', 'staging'). Helps avoid collisions in multi-environment accounts."
   type        = string
-  default     = "sentinel"
+  default     = "ca_sentinel"
 
   validation {
     condition     = can(regex("^[a-z0-9-]{1,24}$", var.name_prefix))
@@ -107,8 +107,8 @@ variable "external_id" {
   type        = string
 
   validation {
-    condition     = can(regex("^sentinel:", var.external_id))
-    error_message = "external_id must start with 'sentinel:' — copy the value from Sentinel's integration setup screen."
+    condition     = can(regex("^ca_sentinel:", var.external_id))
+    error_message = "external_id must start with 'ca_sentinel:' — copy the value from Sentinel's integration setup screen."
   }
 }
 

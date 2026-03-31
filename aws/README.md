@@ -56,10 +56,10 @@ Copy the `role_arn`, `sqs_queue_url`, and `sqs_region` values back into the Sent
 You can also use the JSON config output with the API:
 
 ```bash
-curl -X PATCH https://your-sentinel/api/modules/aws/integrations/YOUR_INTEGRATION_ID \
+curl -X PATCH https://your-ca_sentinel/api/modules/aws/integrations/YOUR_INTEGRATION_ID \
   -H "Cookie: $SESSION" \
   -H "Content-Type: application/json" \
-  -d "$(terraform output -json sentinel_integration_config | jq '. + {name: "production"}')"
+  -d "$(terraform output -json ca_sentinel_integration_config | jq '. + {name: "production"}')"
 ```
 
 ## Event delivery patterns
@@ -90,12 +90,12 @@ For AWS Organizations with a centralized CloudTrail org trail:
 
 ```hcl
 # In the management account — trail already sends to SNS
-module "sentinel" {
+module "ca_sentinel" {
   source = "./aws"
 
-  sentinel_account_id      = "111111111111"
-  external_id              = "sentinel:your-org-id:abc123..."  # from Sentinel UI
-  name_prefix              = "sentinel-org"
+  ca_sentinel_account_id      = "111111111111"
+  external_id              = "ca_sentinel:your-org-id:abc123..."  # from Sentinel UI
+  name_prefix              = "ca_sentinel-org"
   cloudtrail_sns_topic_arn = "arn:aws:sns:us-east-1:222222222222:org-cloudtrail"
   enable_eventbridge_rule  = false
 }
@@ -119,10 +119,10 @@ If you rotate the external ID in Sentinel (via the **Rotate External ID** button
 
 | Name | Description | Type | Default | Required |
 |---|---|---|---|---|
-| `sentinel_account_id` | AWS account ID where Sentinel is hosted | `string` | — | yes |
-| `external_id` | External ID from Sentinel's setup screen (must start with `sentinel:`) | `string` | — | yes |
-| `sentinel_role_name` | IAM role name in the Sentinel account | `string` | `"CASentinelServiceRole"` | no |
-| `name_prefix` | Prefix for resource names | `string` | `"sentinel"` | no |
+| `ca_sentinel_account_id` | AWS account ID where Sentinel is hosted | `string` | — | yes |
+| `external_id` | External ID from Sentinel's setup screen (must start with `ca_sentinel:`) | `string` | — | yes |
+| `ca_sentinel_role_name` | IAM role name in the Sentinel account | `string` | `"CASentinelServiceRole"` | no |
+| `name_prefix` | Prefix for resource names | `string` | `"ca_sentinel"` | no |
 | `tags` | Additional tags for all resources | `map(string)` | `{}` | no |
 | `enable_eventbridge_rule` | Create EventBridge rule for CloudTrail events | `bool` | `true` | no |
 | `eventbridge_event_pattern` | Custom EventBridge event pattern (JSON) | `string` | `null` | no |
@@ -144,7 +144,7 @@ If you rotate the external ID in Sentinel (via the **Rotate External ID** button
 | `account_id` | This AWS account ID |
 | `kms_key_arn` | KMS key ARN (if created) |
 | `dlq_url` | Dead-letter queue URL |
-| `sentinel_integration_config` | JSON config block for Sentinel's integration API |
+| `ca_sentinel_integration_config` | JSON config block for Sentinel's integration API |
 
 ## Destroying
 

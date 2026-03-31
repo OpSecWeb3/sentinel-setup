@@ -4,12 +4,12 @@
 
 output "sqs_queue_url" {
   description = "SQS queue URL — enter this in Sentinel as 'SQS Queue URL'."
-  value       = aws_sqs_queue.sentinel.url
+  value       = aws_sqs_queue.ca_sentinel.url
 }
 
 output "sqs_queue_arn" {
   description = "SQS queue ARN — for reference and IAM policy audits."
-  value       = aws_sqs_queue.sentinel.arn
+  value       = aws_sqs_queue.ca_sentinel.arn
 }
 
 output "sqs_region" {
@@ -19,7 +19,7 @@ output "sqs_region" {
 
 output "role_arn" {
   description = "IAM role ARN — enter this in Sentinel as 'Role ARN'."
-  value       = aws_iam_role.sentinel.arn
+  value       = aws_iam_role.ca_sentinel.arn
 }
 
 output "account_id" {
@@ -34,16 +34,16 @@ output "kms_key_arn" {
 
 output "dlq_url" {
   description = "Dead-letter queue URL — monitor this for failed messages."
-  value       = aws_sqs_queue.sentinel_dlq.url
+  value       = aws_sqs_queue.ca_sentinel_dlq.url
 }
 
 # Convenience: a map you can feed directly to Sentinel's API.
-output "sentinel_integration_config" {
+output "ca_sentinel_integration_config" {
   description = "JSON-ready config block for Sentinel's POST /modules/aws/integrations endpoint."
   value = {
     accountId   = data.aws_caller_identity.current.account_id
-    roleArn     = aws_iam_role.sentinel.arn
-    sqsQueueUrl = aws_sqs_queue.sentinel.url
+    roleArn     = aws_iam_role.ca_sentinel.arn
+    sqsQueueUrl = aws_sqs_queue.ca_sentinel.url
     sqsRegion   = data.aws_region.current.name
   }
 }

@@ -1,6 +1,6 @@
 # Sentinel Setup Scripts
 
-Infrastructure-as-code modules for connecting external services to [Sentinel](https://github.com/your-org/sentinel), the security monitoring platform.
+Infrastructure-as-code modules for connecting external services to [Sentinel](https://github.com/your-org/ca_sentinel), the security monitoring platform.
 
 Each directory is a self-contained setup module that provisions the resources Sentinel needs in your cloud account. Run them before creating the corresponding integration in the Sentinel UI.
 
@@ -15,11 +15,11 @@ Each directory is a self-contained setup module that provisions the resources Se
 ### As a Terraform module source
 
 ```hcl
-module "sentinel_aws" {
-  source = "github.com/your-org/sentinel-setup//aws?ref=v1.0.0"
+module "ca_sentinel_aws" {
+  source = "github.com/your-org/ca_sentinel-setup//aws?ref=v1.0.0"
 
-  sentinel_account_id = "123456789012"
-  external_id         = "sentinel:org:your-org-id"
+  ca_sentinel_account_id = "123456789012"
+  external_id         = "ca_sentinel:org:your-org-id"
 }
 ```
 
@@ -27,7 +27,7 @@ module "sentinel_aws" {
 
 ```bash
 git clone https://github.com/your-org/sentinel-setup.git
-cd sentinel-setup/aws
+cd ca_sentinel-setup/aws
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars
 terraform init && terraform apply
