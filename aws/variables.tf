@@ -13,9 +13,9 @@ variable "sentinel_account_id" {
 }
 
 variable "sentinel_role_name" {
-  description = "Name of the IAM role in the Sentinel account that will assume into this account. Defaults to 'SentinelService'."
+  description = "Name of the IAM role in the Sentinel account that will assume into this account. Defaults to 'CASentinelServiceRole'."
   type        = string
-  default     = "SentinelService"
+  default     = "CASentinelServiceRole"
 }
 
 # --------------------------------------------------------------------------
@@ -103,9 +103,13 @@ variable "kms_key_arn" {
 # --------------------------------------------------------------------------
 
 variable "external_id" {
-  description = "External ID for the cross-account assume-role trust policy. Prevents confused-deputy attacks. Sentinel provides this value during setup."
+  description = "Required — copy from Sentinel's integration setup screen. Prevents confused-deputy attacks by ensuring only Sentinel can assume this role."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = can(regex("^sentinel:", var.external_id))
+    error_message = "external_id must start with 'sentinel:' — copy the value from Sentinel's integration setup screen."
+  }
 }
 
 # --------------------------------------------------------------------------

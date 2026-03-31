@@ -22,26 +22,41 @@ This Terraform module provisions the AWS-side resources required to connect your
 
 ## Quick start
 
+### Step 1 — Start the integration in Sentinel
+
+1. Open Sentinel and go to **AWS Integrations > New Integration**
+2. Enter your integration name and AWS account ID
+3. Sentinel generates a unique **external ID** — copy it
+
+### Step 2 — Copy the external ID and run Terraform
+
 ```bash
-cd scripts/aws-setup
+cd aws
 
-# 1. Configure
+# Configure
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
+# Edit terraform.tfvars:
+#   - Set sentinel_account_id
+#   - Paste the external_id from Step 1
 
-# 2. Deploy
+# Deploy
 terraform init
 terraform plan
 terraform apply
-
-# 3. Copy outputs into Sentinel
-terraform output sentinel_integration_config
 ```
 
-The `sentinel_integration_config` output is a JSON object you can paste directly into Sentinel's AWS integration form, or use with the API:
+### Step 3 — Paste Terraform outputs into Sentinel
 
 ```bash
-curl -X POST https://your-sentinel/api/modules/aws/integrations \
+terraform output
+```
+
+Copy the `role_arn`, `sqs_queue_url`, and `sqs_region` values back into the Sentinel integration setup screen, then click **Finalize** to activate the integration.
+
+You can also use the JSON config output with the API:
+
+```bash
+curl -X PATCH https://your-sentinel/api/modules/aws/integrations/YOUR_INTEGRATION_ID \
   -H "Cookie: $SESSION" \
   -H "Content-Type: application/json" \
   -d "$(terraform output -json sentinel_integration_config | jq '. + {name: "production"}')"
@@ -76,10 +91,10 @@ For AWS Organizations with a centralized CloudTrail org trail:
 ```hcl
 # In the management account — trail already sends to SNS
 module "sentinel" {
-  source = "./scripts/aws-setup"
+  source = "./aws"
 
   sentinel_account_id      = "111111111111"
-  external_id              = "sentinel:org:your-org-id"
+  external_id              = "sentinel:your-org-id:abc123..."  # from Sentinel UI
   name_prefix              = "sentinel-org"
   cloudtrail_sns_topic_arn = "arn:aws:sns:us-east-1:222222222222:org-cloudtrail"
   enable_eventbridge_rule  = false
@@ -88,10 +103,14 @@ module "sentinel" {
 
 For per-account monitoring, run this module once in each account with a unique `name_prefix`.
 
+## External ID rotation
+
+If you rotate the external ID in Sentinel (via the **Rotate External ID** button), the integration enters a `needs_update` state. You must update the `external_id` in your `terraform.tfvars` with the new value and run `terraform apply` to update the IAM trust policy, then acknowledge the rotation in Sentinel.
+
 ## Security considerations
 
 - **Least privilege**: the IAM role only has `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes`, `sqs:GetQueueUrl`, and optionally `kms:Decrypt`. No write access to any AWS service.
-- **External ID**: use `external_id` to prevent [confused deputy attacks](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Sentinel generates this value during setup.
+- **External ID**: always required to prevent [confused deputy attacks](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Sentinel generates this value during setup — you cannot supply your own.
 - **Encryption**: SQS messages are encrypted at rest using either a customer-managed KMS key (default) or AWS-managed SSE-SQS.
 - **DLQ**: messages that fail processing 5 times are moved to the dead-letter queue with 14-day retention for forensic review.
 - **Session duration**: the IAM role limits sessions to 1 hour. Sentinel automatically renews.
@@ -101,7 +120,8 @@ For per-account monitoring, run this module once in each account with a unique `
 | Name | Description | Type | Default | Required |
 |---|---|---|---|---|
 | `sentinel_account_id` | AWS account ID where Sentinel is hosted | `string` | — | yes |
-| `sentinel_role_name` | IAM role name in the Sentinel account | `string` | `"SentinelService"` | no |
+| `external_id` | External ID from Sentinel's setup screen (must start with `sentinel:`) | `string` | — | yes |
+| `sentinel_role_name` | IAM role name in the Sentinel account | `string` | `"CASentinelServiceRole"` | no |
 | `name_prefix` | Prefix for resource names | `string` | `"sentinel"` | no |
 | `tags` | Additional tags for all resources | `map(string)` | `{}` | no |
 | `enable_eventbridge_rule` | Create EventBridge rule for CloudTrail events | `bool` | `true` | no |
@@ -111,7 +131,6 @@ For per-account monitoring, run this module once in each account with a unique `
 | `sqs_visibility_timeout_seconds` | Message visibility timeout | `number` | `120` | no |
 | `create_kms_key` | Create a dedicated KMS key for SQS | `bool` | `true` | no |
 | `kms_key_arn` | ARN of an existing KMS key (when `create_kms_key = false`) | `string` | `null` | no |
-| `external_id` | External ID for assume-role trust policy | `string` | `""` | no |
 | `cloudtrail_sns_topic_arn` | ARN of existing CloudTrail SNS topic | `string` | `null` | no |
 
 ## Outputs

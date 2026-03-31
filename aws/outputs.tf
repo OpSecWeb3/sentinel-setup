@@ -43,7 +43,6 @@ output "sentinel_integration_config" {
   value = {
     accountId   = data.aws_caller_identity.current.account_id
     roleArn     = aws_iam_role.sentinel.arn
-    externalId  = var.external_id != "" ? var.external_id : null
     sqsQueueUrl = aws_sqs_queue.sentinel.url
     sqsRegion   = data.aws_region.current.name
   }

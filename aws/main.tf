@@ -232,14 +232,10 @@ resource "aws_iam_role" "sentinel" {
         Effect    = "Allow"
         Principal = { AWS = "arn:aws:iam::${var.sentinel_account_id}:role/${var.sentinel_role_name}" }
         Action    = "sts:AssumeRole"
-        Condition = merge(
+        Condition = {
           # External ID prevents confused-deputy attacks
-          var.external_id != "" ? {
-            StringEquals = { "sts:ExternalId" = var.external_id }
-          } : {},
-          # Optional: restrict to tagged sessions
-          {},
-        )
+          StringEquals = { "sts:ExternalId" = var.external_id }
+        }
       }
     ]
   })

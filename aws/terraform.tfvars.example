@@ -9,13 +9,14 @@
 sentinel_account_id = "123456789012"
 
 # Required: name of the IAM role in the Sentinel account.
-# Default is "SentinelService" — only change if your Sentinel deployment
+# Default is "CASentinelServiceRole" — only change if your Sentinel deployment
 # uses a different role name.
-# sentinel_role_name = "SentinelService"
+sentinel_role_name = "CASentinelServiceRole"
 
-# Recommended: external ID for cross-account trust.
-# Sentinel generates this when you start the integration setup in the UI.
-# external_id = "sentinel:org:abc123"
+# Required: external ID for cross-account trust.
+# Copy this value from Sentinel's integration setup screen (Step 1).
+# It starts with "sentinel:" and is unique to your integration.
+external_id = "sentinel:YOUR_ORG_ID:COPY_FROM_SENTINEL_UI"
 
 # Optional: prefix for resource names (useful for multi-env accounts).
 # name_prefix = "sentinel-prod"
