@@ -23,7 +23,9 @@ locals {
   )
 
   kms_key_arn = var.create_kms_key ? aws_kms_key.ca_sentinel[0].arn : var.kms_key_arn
-  use_kms     = local.kms_key_arn != null
+  # Must not depend on kms_key_arn when create_kms_key is true — the new key's ARN is unknown until apply,
+  # which would make count on aws_iam_role_policy.ca_sentinel_kms unknown.
+  use_kms = var.create_kms_key || var.kms_key_arn != null
 }
 
 data "aws_caller_identity" "current" {}
@@ -103,7 +105,7 @@ resource "aws_sqs_queue" "ca_sentinel" {
   name                       = "${var.name_prefix}-events"
   visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
   message_retention_seconds  = var.sqs_message_retention_seconds
-  receive_wait_time_seconds  = 5 # long-polling reduces empty receives and cost
+  receive_wait_time_seconds  = 20 # max long-polling — fewer empty receives vs shorter waits
   tags                       = local.tags
 
   # Encryption
@@ -124,8 +126,8 @@ resource "aws_sqs_queue_policy" "ca_sentinel" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = concat(
-      # EventBridge -> SQS
-      var.enable_eventbridge_rule || var.enable_spot_interruption_rule ? [
+      # EventBridge -> SQS (primary region rules + forwarded global events rule)
+      var.enable_eventbridge_rule || var.enable_spot_interruption_rule || local.deploy_global_forwarding ? [
         {
           Sid       = "AllowEventBridge"
           Effect    = "Allow"
@@ -213,6 +215,101 @@ resource "aws_cloudwatch_event_target" "spot_to_sqs" {
 
   rule      = aws_cloudwatch_event_rule.spot_interruption[0].name
   target_id = "ca_sentinel-sqs"
+  arn       = aws_sqs_queue.ca_sentinel.arn
+}
+
+# --------------------------------------------------------------------------
+# Global event forwarding — us-east-1 → primary region
+#
+# IAM, STS, and console sign-in events only appear in us-east-1. When the
+# primary region is different, we deploy EventBridge rules in us-east-1 that
+# forward events to the primary region's default event bus, where a catch
+# rule routes them into the SQS queue.
+# --------------------------------------------------------------------------
+
+locals {
+  # Only deploy forwarding if enabled AND primary region isn't already us-east-1
+  deploy_global_forwarding = var.enable_global_event_forwarding && data.aws_region.current.name != "us-east-1"
+}
+
+# us-east-1: rule that matches CloudTrail global events
+resource "aws_cloudwatch_event_rule" "global_cloudtrail" {
+  count    = local.deploy_global_forwarding ? 1 : 0
+  provider = aws.us_east_1
+
+  name        = "${var.name_prefix}-global-events"
+  description = "Forwards IAM/STS/sign-in events from us-east-1 to ${data.aws_region.current.name} for Sentinel"
+  tags        = local.tags
+
+  event_pattern = jsonencode({
+    source      = ["aws.cloudtrail", "aws.signin"]
+    detail-type = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+  })
+}
+
+# us-east-1: forward matched events to the primary region's default event bus
+resource "aws_cloudwatch_event_target" "global_to_primary_bus" {
+  count    = local.deploy_global_forwarding ? 1 : 0
+  provider = aws.us_east_1
+
+  rule      = aws_cloudwatch_event_rule.global_cloudtrail[0].name
+  target_id = "${var.name_prefix}-fwd-to-primary"
+  arn       = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:event-bus/default"
+  role_arn  = aws_iam_role.global_event_forwarder[0].arn
+}
+
+# IAM role that allows EventBridge in us-east-1 to PutEvents on the primary bus
+resource "aws_iam_role" "global_event_forwarder" {
+  count = local.deploy_global_forwarding ? 1 : 0
+
+  name = "${var.name_prefix}-global-fwd-role"
+  tags = local.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "global_event_forwarder" {
+  count = local.deploy_global_forwarding ? 1 : 0
+
+  name = "${var.name_prefix}-global-fwd-put-events"
+  role = aws_iam_role.global_event_forwarder[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "events:PutEvents"
+      Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:event-bus/default"
+    }]
+  })
+}
+
+# Primary region: catch forwarded events from us-east-1 and route to SQS
+resource "aws_cloudwatch_event_rule" "forwarded_global" {
+  count = local.deploy_global_forwarding ? 1 : 0
+
+  name        = "${var.name_prefix}-forwarded-global-events"
+  description = "Catches global events forwarded from us-east-1 and routes to Sentinel SQS"
+  tags        = local.tags
+
+  event_pattern = jsonencode({
+    source      = ["aws.cloudtrail", "aws.signin"]
+    detail-type = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "forwarded_global_to_sqs" {
+  count = local.deploy_global_forwarding ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.forwarded_global[0].name
+  target_id = "${var.name_prefix}-global-sqs"
   arn       = aws_sqs_queue.ca_sentinel.arn
 }
 

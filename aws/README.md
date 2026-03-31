@@ -11,6 +11,7 @@ This Terraform module provisions the AWS-side resources required to connect your
 | **IAM Role** | Cross-account role that Sentinel assumes — least-privilege SQS read-only |
 | **KMS Key** (optional) | Customer-managed encryption for queue messages at rest |
 | **EventBridge Rule** (optional) | Routes CloudTrail management events and sign-in events to the queue |
+| **EventBridge Rule — us-east-1** (auto) | Forwards global events (IAM, STS, sign-in) to the primary region |
 | **EventBridge Rule** (optional) | Routes EC2 Spot interruption warnings to the queue |
 | **SNS Subscription** (optional) | Subscribes the queue to an existing CloudTrail SNS topic |
 
@@ -19,6 +20,7 @@ This Terraform module provisions the AWS-side resources required to connect your
 - Terraform >= 1.5
 - AWS CLI configured with credentials for the target account
 - Your Sentinel account ID (provided by your Sentinel admin)
+- If deploying outside us-east-1, your Terraform config must define an `aws.us_east_1` provider alias (see Quick start)
 
 ## Quick start
 
@@ -36,9 +38,38 @@ cd aws
 # Configure
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
-#   - Set sentinel_account_id
+#   - Set ca_sentinel_account_id
 #   - Paste the external_id from Step 1
+```
 
+If your primary region is **not** us-east-1, add a provider alias so global events (IAM, STS, console sign-in) are forwarded automatically:
+
+```hcl
+# providers.tf
+provider "aws" {
+  region = "eu-west-1"  # your primary region
+}
+
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+```
+
+If your primary region **is** us-east-1, the alias is still required but no forwarding resources are created:
+
+```hcl
+provider "aws" {
+  region = "us-east-1"
+}
+
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+```
+
+```bash
 # Deploy
 terraform init
 terraform plan
@@ -70,7 +101,9 @@ curl -X PATCH https://your-ca_sentinel/api/modules/aws/integrations/YOUR_INTEGRA
 CloudTrail ──> EventBridge Rule ──> SQS Queue ──> Sentinel
 ```
 
-Set `enable_eventbridge_rule = true` (default). This captures management events and console sign-in events. Customize the pattern with `eventbridge_event_pattern`.
+Set `enable_eventbridge_rule = true` (default). This captures management events and console sign-in events in the primary region. Customize the pattern with `eventbridge_event_pattern`.
+
+**Global events:** IAM, STS, and console sign-in events only appear in us-east-1. When your primary region is different, the module automatically deploys a second EventBridge rule in us-east-1 that forwards these events to the primary region's event bus (bus-to-bus), where they're routed to the SQS queue. This is controlled by `enable_global_event_forwarding` (default: `true`).
 
 ### Pattern B: Existing SNS topic
 
@@ -127,6 +160,7 @@ If you rotate the external ID in Sentinel (via the **Rotate External ID** button
 | `enable_eventbridge_rule` | Create EventBridge rule for CloudTrail events | `bool` | `true` | no |
 | `eventbridge_event_pattern` | Custom EventBridge event pattern (JSON) | `string` | `null` | no |
 | `enable_spot_interruption_rule` | Create rule for EC2 Spot interruption warnings | `bool` | `false` | no |
+| `enable_global_event_forwarding` | Forward IAM/STS/sign-in events from us-east-1 to primary region | `bool` | `true` | no |
 | `sqs_message_retention_seconds` | Message retention period | `number` | `345600` (4d) | no |
 | `sqs_visibility_timeout_seconds` | Message visibility timeout | `number` | `120` | no |
 | `create_kms_key` | Create a dedicated KMS key for SQS | `bool` | `true` | no |

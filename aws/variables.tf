@@ -25,7 +25,7 @@ variable "ca_sentinel_role_name" {
 variable "name_prefix" {
   description = "Prefix for all resource names (e.g. 'prod', 'staging'). Helps avoid collisions in multi-environment accounts."
   type        = string
-  default     = "ca_sentinel"
+  default     = "ca-sentinel"
 
   validation {
     condition     = can(regex("^[a-z0-9-]{1,24}$", var.name_prefix))
@@ -59,6 +59,12 @@ variable "enable_spot_interruption_rule" {
   description = "Create an EventBridge rule for EC2 Spot Instance interruption warnings."
   type        = bool
   default     = false
+}
+
+variable "enable_global_event_forwarding" {
+  description = "Deploy an EventBridge rule in us-east-1 to forward global events (IAM, STS, console sign-in) to the primary region's SQS queue. Required when the primary region is not us-east-1. Requires the aws.us_east_1 provider alias."
+  type        = bool
+  default     = true
 }
 
 # --------------------------------------------------------------------------
@@ -107,7 +113,7 @@ variable "external_id" {
   type        = string
 
   validation {
-    condition     = can(regex("^ca_sentinel:", var.external_id))
+    condition     = can(regex("^sentinel:", var.external_id))
     error_message = "external_id must start with 'ca_sentinel:' — copy the value from Sentinel's integration setup screen."
   }
 }

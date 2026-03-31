@@ -40,6 +40,15 @@ external_id = "sentinel:YOUR_ORG_ID:COPY_FROM_SENTINEL_UI"
 # cloudtrail_sns_topic_arn = "arn:aws:sns:us-east-1:123456789012:cloudtrail-notifications"
 
 # --------------------------------------------------------------------------
+# Global event forwarding (us-east-1)
+# --------------------------------------------------------------------------
+
+# Forward IAM, STS, and console sign-in events from us-east-1 to the primary
+# region. Enabled by default — disable only if your primary region IS us-east-1
+# (in which case it's a no-op anyway) or if you use an org trail.
+# enable_global_event_forwarding = true
+
+# --------------------------------------------------------------------------
 # Optional event types
 # --------------------------------------------------------------------------
 
