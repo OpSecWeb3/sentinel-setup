@@ -183,8 +183,21 @@ resource "aws_cloudwatch_event_rule" "cloudtrail" {
   tags        = local.tags
 
   event_pattern = var.eventbridge_event_pattern != null ? var.eventbridge_event_pattern : jsonencode({
-    source      = ["aws.cloudtrail", "aws.signin"]
+    source      = ["aws.cloudtrail", "aws.signin", "aws.iam", "aws.ec2", "aws.s3", "aws.route53", "aws.ssm", "aws.secretsmanager", "aws.dynamodb", "aws.ecs"]
     detail-type = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+    detail = {
+      eventSource = [
+        "iam.amazonaws.com",
+        "cloudtrail.amazonaws.com",
+        "ec2.amazonaws.com",
+        "s3.amazonaws.com",
+        "route53.amazonaws.com",
+        "ssm.amazonaws.com",
+        "secretsmanager.amazonaws.com",
+        "dynamodb.amazonaws.com",
+        "ecs.amazonaws.com"
+      ]
+    }
   })
 }
 
@@ -242,8 +255,15 @@ resource "aws_cloudwatch_event_rule" "global_cloudtrail" {
   tags        = local.tags
 
   event_pattern = jsonencode({
-    source      = ["aws.cloudtrail", "aws.signin"]
+    source      = ["aws.cloudtrail", "aws.signin", "aws.iam", "aws.route53"]
     detail-type = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+    detail = {
+      eventSource = [
+        "iam.amazonaws.com",
+        "cloudtrail.amazonaws.com",
+        "route53.amazonaws.com"
+      ]
+    }
   })
 }
 
@@ -300,8 +320,18 @@ resource "aws_cloudwatch_event_rule" "forwarded_global" {
   tags        = local.tags
 
   event_pattern = jsonencode({
-    source      = ["aws.cloudtrail", "aws.signin"]
+    source      = ["aws.cloudtrail", "aws.signin", "aws.iam", "aws.route53"]
     detail-type = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+    detail = {
+      eventSource = [
+        "iam.amazonaws.com",
+        "sts.amazonaws.com",
+        "signin.amazonaws.com",
+        "organizations.amazonaws.com",
+        "cloudtrail.amazonaws.com",
+        "route53.amazonaws.com"
+      ]
+    }
   })
 }
 
